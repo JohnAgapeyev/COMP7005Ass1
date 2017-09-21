@@ -13,7 +13,7 @@ all: $(patsubst %.c, %.o, $(SRCWILD))
 	$(CC) -c $(CFLAGS) $< -o $(patsubst %.c, %.o, $<)
 
 $(DEPS): $(SRCWILD) $(HEADWILD)
-	$(CC) $(CFLAGS) -MM $(SRCWILD) > $(DEPS)
+	@$(CC) $(CFLAGS) -MM $(SRCWILD) > $(DEPS)
 
 ifneq ($(MAKECMDGOALS), clean)
 -include $(DEPS)
