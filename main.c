@@ -1,4 +1,5 @@
 #include <sys/socket.h>
+#include <sys/epoll.h>
 #include <netdb.h>
 #include <netinet/ip.h>
 #include <fcntl.h>
@@ -64,6 +65,7 @@ void startServer(void) {
         perror("Connection error");
         exit(EXIT_FAILURE);
     }
+    setNonBlocking(dataSocket);
     //Do stuff now
 }
 
@@ -82,7 +84,41 @@ void startClient(void) {
         perror("Accept failure");
         exit(EXIT_FAILURE);
     }
+    setNonBlocking(dataSocket);
     //Do stuff now
+    char *cmd = malloc(1024);
+    char *filename = malloc(1024);
+    getCommand(&cmd, &filename);
+    if (cmd[0] == 'G') {
+        //GET command
+        const size_t BUF_SIZE = strlen(cmd) + strlen(filename) + 1;
+        char *buffer = malloc(BUF_SIZE);
+        memcpy(buffer, cmd, strlen(cmd));
+        buffer[strlen(cmd)] = ' ';
+        memcpy(buffer + strlen(cmd) + 1, filename, strlen(filename));
+
+        send(messageSocket, buffer, BUF_SIZE, 0);
+
+        char response;
+        recv(messageSocket, &response, 1, 0);
+        switch(response) {
+            case 'G':
+                //Do reading
+                break;
+            case 'B':
+                printf("%s does not exist on the server\n", filename);
+                break;
+            default:
+                puts("Server sent back bad response");
+                exit(EXIT_FAILURE);
+        }
+        free(buffer);
+    } else {
+        //SEND comand
+        sendFile(messageSocket, dataSocket, filename);
+    }
+    free(cmd);
+    free(filename);
 }
 
 int createSocket(void) {
@@ -122,7 +158,7 @@ struct hostent * getDestination(void) {
 }
 
 char * getUserInput(const char *prompt) {
-    size_t MAX_SIZE = 200;
+    const size_t MAX_SIZE = 1024;
     char *buffer = calloc(MAX_SIZE, sizeof(char));
     if (buffer == NULL) {
         perror("Allocation failure");
@@ -143,18 +179,17 @@ char * getUserInput(const char *prompt) {
     size_t n = 0;
     for (;;) {
         c = getchar();
-        if (c == EOF || isspace(c)) {
+        if (c == EOF || (isspace(c) && c != ' ')) {
             buffer[n] = '\0';
             break;
         }
         buffer[n] = c;
         if (n == MAX_SIZE - 1) {
-            MAX_SIZE *= 2;
-            buffer = realloc(buffer, MAX_SIZE);
-            if (buffer == NULL) {
-                perror("Allocation failure");
-                abort();
-            }
+            printf("Message too big\n");
+            memset(buffer, 0, MAX_SIZE);
+            while ((c = getchar()) != '\n' && c != EOF) {}
+            n = 0;
+            continue;
         }
         ++n;
     }
@@ -178,4 +213,46 @@ void sendFile(int commSock, int dataSock, const char *filename) {
         send(dataSock, &buffer, nread, 0);
     }
     fclose(fp);
+}
+
+int createEpollFD(void) {
+    int epollfd;
+    if ((epollfd = epoll_create1(0)) == -1) {
+        perror("Epoll create");
+        exit(EXIT_FAILURE);
+    }
+    return epollfd;
+}
+
+void addEpollSoocket(const int epollfd, const int sock, struct epoll_event *ev) {
+    if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sock, ev) == -1) {
+        perror("epoll_ctl");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void getCommand(char **command, char **filename) {
+    char *message;
+    int n;
+    for(;;) {
+        message = getUserInput("Enter GET/SEND followed by the desired filename: "); 
+        if ((n = sscanf(message, "%s %s", *command, *filename)) == EOF) {
+            perror("sscanf");
+            exit(EXIT_FAILURE);
+        }
+        free(message);
+        if (n == 2) {
+            //Validate
+            if (strncmp(*command, "GET", 3) == 0) {
+                if (access(*filename, R_OK) == 0) {
+                    break;
+                }
+            } else if (strncmp(*command, "SEND", 4) == 0) {
+                if (access(*filename, R_OK) == 0) {
+                    break;
+                }
+            }
+        }
+        printf("Invalid input\n");
+    }
 }
