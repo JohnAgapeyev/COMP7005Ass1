@@ -56,6 +56,8 @@ void startServer(void) {
     socklen_t clientAddrSize = sizeof(struct sockaddr_in);
     memset(&clientAddr, 0, sizeof(struct sockaddr_in));
 
+    dataSocket = createSocket();
+
     if ((messageSocket = accept(listenSocket, (struct sockaddr *) &clientAddr, &clientAddrSize)) == -1) {
         perror("Accept failure");
         exit(EXIT_FAILURE);
@@ -76,6 +78,8 @@ void startClient(void) {
     destAddr.sin_port = htons(LISTENPORT);
     destAddr.sin_addr.s_addr = *(getDestination()->h_addr_list[0]);
 
+    messageSocket = createSocket();
+
     if (connect(messageSocket, (struct sockaddr *) &destAddr, sizeof(destAddr)) == -1) {
         perror("Connection error");
         exit(EXIT_FAILURE);
@@ -86,8 +90,8 @@ void startClient(void) {
     }
     setNonBlocking(dataSocket);
     //Do stuff now
-    char *cmd = malloc(1024);
-    char *filename = malloc(1024);
+    char *cmd = malloc(MAX_USER_BUFFER);
+    char *filename = malloc(MAX_USER_BUFFER);
     getCommand(&cmd, &filename);
     if (cmd[0] == 'G') {
         //GET command
@@ -103,7 +107,17 @@ void startClient(void) {
         recv(messageSocket, &response, 1, 0);
         switch(response) {
             case 'G':
-                //Do reading
+                {
+                    //Do reading
+                    char *dataBuf = calloc(MAX_READ_BUFFER, sizeof(char));
+                    int n;
+                    FILE *fp = fopen(filename, "w");
+                    while((n = recv(dataSocket, dataBuf, MAX_READ_BUFFER, 0)) > 0) {
+                        fwrite(dataBuf, sizeof(char), n, fp);
+                    }
+                    free(dataBuf);
+                    fclose(fp);
+                }
                 break;
             case 'B':
                 printf("%s does not exist on the server\n", filename);
@@ -158,8 +172,7 @@ struct hostent * getDestination(void) {
 }
 
 char *getUserInput(const char *prompt) {
-    const size_t MAX_SIZE = 1024;
-    char *buffer = calloc(MAX_SIZE, sizeof(char));
+    char *buffer = calloc(MAX_USER_BUFFER, sizeof(char));
     if (buffer == NULL) {
         perror("Allocation failure");
         abort();
@@ -184,9 +197,9 @@ char *getUserInput(const char *prompt) {
             break;
         }
         buffer[n] = c;
-        if (n == MAX_SIZE - 1) {
+        if (n == MAX_USER_BUFFER - 1) {
             printf("Message too big\n");
-            memset(buffer, 0, MAX_SIZE);
+            memset(buffer, 0, MAX_USER_BUFFER);
             while ((c = getchar()) != '\n' && c != EOF) {}
             n = 0;
             continue;
@@ -205,11 +218,10 @@ void sendFile(int commSock, int dataSock, const char *filename) {
         return;
     }
     send(commSock, &good, 1, 0);
-    const size_t BUF_SIZE = 4096;
-    char buffer[BUF_SIZE];
-    memset(&buffer, 0, BUF_SIZE);
+    char buffer[MAX_READ_BUFFER];
+    memset(&buffer, 0, MAX_READ_BUFFER);
     int nread;
-    while ((nread = fread(buffer, sizeof(char), BUF_SIZE, fp)) > 0) {
+    while ((nread = fread(buffer, sizeof(char), MAX_READ_BUFFER, fp)) > 0) {
         send(dataSock, &buffer, nread, 0);
     }
     fclose(fp);
