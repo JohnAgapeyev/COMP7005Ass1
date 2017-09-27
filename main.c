@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
 }
 
 void startServer(void) {
-    struct sockaddr_in clientAddr; 
+    struct sockaddr_in clientAddr;
     socklen_t clientAddrSize = sizeof(struct sockaddr_in);
     memset(&clientAddr, 0, sizeof(struct sockaddr_in));
 
@@ -62,13 +62,67 @@ void startServer(void) {
         perror("Accept failure");
         exit(EXIT_FAILURE);
     }
-    
+
     if (connect(dataSocket, (struct sockaddr *) &clientAddr, clientAddrSize) == -1) {
         perror("Connection error");
         exit(EXIT_FAILURE);
     }
     setNonBlocking(dataSocket);
     //Do stuff now
+
+    int epollfd = createEpollFD();
+
+    struct epoll_event ev;
+    ev.events = EPOLLIN | EPOLLET | EPOLLEXCLUSIVE;
+    ev.data.fd = messageSocket;
+
+    addEpollSocket(epollfd, messageSocket, &ev);
+
+    struct epoll_event *eventList = calloc(MAX_EPOLL_EVENTS, sizeof(struct epoll_event));
+
+    int nevents = waitForEpollEvent(epollfd, eventList);
+    for (int i = 0; i< nevents; ++i) {
+        if (eventList[i].events & EPOLLERR) {
+            perror("Socket error");
+            close(eventList[i].data.fd);
+            continue;
+        } else if (eventList[i].events & EPOLLHUP) {
+            close(eventList[i].data.fd);
+            continue;
+        } else if (eventList[i].events & EPOLLIN) {
+            //Read from message socket
+            char *buffer = calloc(MAX_READ_BUFFER, sizeof(char));
+            int n;
+            char *bp = buffer;
+            size_t maxRead = MAX_READ_BUFFER - 1;
+            while ((n = recv(eventList[i].data.fd, bp, maxRead, 0)) > 0) {
+                bp += n;
+                maxRead -= n;
+            }
+            buffer[MAX_READ_BUFFER - 1 - maxRead] = '\0';
+
+            if (buffer[0] == 'G') {
+                //Get message
+                sendFile(messageSocket, dataSocket, buffer + 4);
+            } else {
+                //Send message
+                char *dataBuf = calloc(MAX_READ_BUFFER, sizeof(char));
+                int n;
+                FILE *fp = fopen(buffer + 5, "w");
+                while((n = recv(dataSocket, dataBuf, MAX_READ_BUFFER, 0)) > 0) {
+                    fwrite(dataBuf, sizeof(char), n, fp);
+                }
+                free(dataBuf);
+                fclose(fp);
+            }
+            free(buffer);
+        }
+    }
+    free(eventList);
+    close(epollfd);
+
+    close(dataSocket);
+    close(messageSocket);
 }
 
 void startClient(void) {
@@ -133,6 +187,9 @@ void startClient(void) {
     }
     free(cmd);
     free(filename);
+
+    close(dataSocket);
+    close(messageSocket);
 }
 
 int createSocket(void) {
@@ -236,7 +293,7 @@ int createEpollFD(void) {
     return epollfd;
 }
 
-void addEpollSoocket(const int epollfd, const int sock, struct epoll_event *ev) {
+void addEpollSocket(const int epollfd, const int sock, struct epoll_event *ev) {
     if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sock, ev) == -1) {
         perror("epoll_ctl");
         exit(EXIT_FAILURE);
@@ -247,7 +304,7 @@ void getCommand(char **command, char **filename) {
     char *message;
     int n;
     for(;;) {
-        message = getUserInput("Enter GET/SEND followed by the desired filename: "); 
+        message = getUserInput("Enter GET/SEND followed by the desired filename: ");
         if ((n = sscanf(message, "%s %s", *command, *filename)) == EOF) {
             perror("sscanf");
             exit(EXIT_FAILURE);
@@ -267,4 +324,13 @@ void getCommand(char **command, char **filename) {
         }
         printf("Invalid input\n");
     }
+}
+
+int waitForEpollEvent(const int epollfd, struct epoll_event *events) {
+    int nevents;
+    if ((nevents = epoll_wait(epollfd, events, MAX_EPOLL_EVENTS, -1)) == -1) {
+        perror("epoll_wait");
+        exit(EXIT_FAILURE);
+    }
+    return nevents;
 }
