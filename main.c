@@ -157,7 +157,7 @@ struct hostent * getDestination(void) {
     return addr;
 }
 
-char * getUserInput(const char *prompt) {
+char *getUserInput(const char *prompt) {
     const size_t MAX_SIZE = 1024;
     char *buffer = calloc(MAX_SIZE, sizeof(char));
     if (buffer == NULL) {
