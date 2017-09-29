@@ -8,6 +8,8 @@
 extern int listenSocket;
 extern int messageSocket;
 extern int dataSocket;
+extern bool isClient;
+extern bool isServer;
 
 struct client {
     int messageSocket;

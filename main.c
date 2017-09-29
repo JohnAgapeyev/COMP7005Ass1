@@ -16,10 +16,10 @@ int listenSocket;
 int messageSocket;
 int dataSocket;
 
-int main(int argc, char **argv) {
-    bool isClient = false;
-    bool isServer = false;
+bool isClient = false;
+bool isServer = false;
 
+int main(int argc, char **argv) {
     int option;
 
     while ((option = getopt(argc, argv, "cs")) != -1) {
@@ -185,8 +185,17 @@ void startClient(void) {
         }
         free(buffer);
     } else {
+        const size_t BUF_SIZE = strlen(cmd) + strlen(filename) + 1;
+        char *buffer = malloc(BUF_SIZE);
+        memcpy(buffer, cmd, strlen(cmd));
+        buffer[strlen(cmd)] = ' ';
+        memcpy(buffer + strlen(cmd) + 1, filename, strlen(filename));
+
+        send(messageSocket, buffer, BUF_SIZE, 0);
+
         //SEND comand
         sendFile(messageSocket, dataSocket, filename);
+        free(buffer);
     }
     free(cmd);
     free(filename);
@@ -281,7 +290,9 @@ void sendFile(int commSock, int dataSock, const char *filename) {
         send(commSock, &bad, 1, 0);
         return;
     }
-    send(commSock, &good, 1, 0);
+    if (isServer) {
+        send(commSock, &good, 1, 0);
+    }
     char buffer[MAX_READ_BUFFER];
     memset(&buffer, 0, MAX_READ_BUFFER);
     int nread;
