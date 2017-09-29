@@ -96,35 +96,38 @@ void startServer(void) {
                 close(eventList[i].data.fd);
                 continue;
             } else if (eventList[i].events & EPOLLIN) {
-                //Read from message socket
-                char *buffer = calloc(MAX_READ_BUFFER, sizeof(char));
-                int n;
-                char *bp = buffer;
-                size_t maxRead = MAX_READ_BUFFER - 1;
-                while ((n = recv(eventList[i].data.fd, bp, maxRead, 0)) > 0) {
-                    bp += n;
-                    maxRead -= n;
-                }
-                buffer[MAX_READ_BUFFER - 1 - maxRead] = '\0';
-
-                if (buffer[0] == 'G') {
-                    //Get message
-                    sendFile(messageSocket, dataSocket, buffer + 4);
-                } else {
-                    //Send message
-                    char *dataBuf = calloc(MAX_READ_BUFFER, sizeof(char));
+#pragma omp task
+                {
+                    //Read from message socket
+                    char *buffer = calloc(MAX_READ_BUFFER, sizeof(char));
                     int n;
-                    if (buffer[0] == '\0') {
-                        exit(EXIT_SUCCESS);
+                    char *bp = buffer;
+                    size_t maxRead = MAX_READ_BUFFER - 1;
+                    while ((n = recv(eventList[i].data.fd, bp, maxRead, 0)) > 0) {
+                        bp += n;
+                        maxRead -= n;
                     }
-                    FILE *fp = fopen(buffer + 5, "w");
-                    while((n = recv(dataSocket, dataBuf, MAX_READ_BUFFER, 0)) > 0) {
-                        fwrite(dataBuf, sizeof(char), n, fp);
+                    buffer[MAX_READ_BUFFER - 1 - maxRead] = '\0';
+
+                    if (buffer[0] == 'G') {
+                        //Get message
+                        sendFile(messageSocket, dataSocket, buffer + 4);
+                    } else {
+                        //Send message
+                        char *dataBuf = calloc(MAX_READ_BUFFER, sizeof(char));
+                        int n;
+                        if (buffer[0] == '\0') {
+                            exit(EXIT_SUCCESS);
+                        }
+                        FILE *fp = fopen(buffer + 5, "w");
+                        while((n = recv(dataSocket, dataBuf, MAX_READ_BUFFER, 0)) > 0) {
+                            fwrite(dataBuf, sizeof(char), n, fp);
+                        }
+                        free(dataBuf);
+                        fclose(fp);
                     }
-                    free(dataBuf);
-                    fclose(fp);
+                    free(buffer);
                 }
-                free(buffer);
             }
         }
         free(eventList);

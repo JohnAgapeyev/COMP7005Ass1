@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -Wextra -std=c11 -pedantic -D_POSIX_C_SOURCE=200809L -g -march=native -flto
+CFLAGS=-Wall -Wextra -std=c11 -pedantic -D_POSIX_C_SOURCE=200809L -g -march=native -flto -fopenmp
 CLIBS=
 EXEC=ass1
 DEPS=$(EXEC).d
@@ -7,7 +7,7 @@ SRCWILD=$(wildcard *.c)
 HEADWILD=$(wildcard *.h)
 
 all: $(patsubst %.c, %.o, $(SRCWILD))
-	$(CC) $(CFLAGS) $^ $(CLIBS) -o $(EXEC) 
+	$(CC) $(CFLAGS) $^ $(CLIBS) -o $(EXEC)
 
 %.o: %.c
 	$(CC) -c $(CFLAGS) $< -o $(patsubst %.c, %.o, $<)
