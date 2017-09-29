@@ -130,7 +130,8 @@ void startClient(void) {
     memset(&destAddr, 0, sizeof(struct sockaddr_in));
     destAddr.sin_family = AF_INET;
     destAddr.sin_port = htons(LISTENPORT);
-    destAddr.sin_addr.s_addr = *(getDestination()->h_addr_list[0]);
+    struct hostent *hp = getDestination();
+    memcpy(&destAddr.sin_addr, hp->h_addr_list[0], hp->h_length);
 
     messageSocket = createSocket();
 
@@ -224,6 +225,10 @@ void bindSocket(const int sock, const unsigned short port) {
 struct hostent * getDestination(void) {
     char *userAddr = getUserInput("Enter the destination address: ");
     struct hostent *addr = gethostbyname(userAddr);
+    if (addr == NULL) {
+        perror("gethostbyname");
+        exit(EXIT_FAILURE);
+    }
     free(userAddr);
     return addr;
 }
