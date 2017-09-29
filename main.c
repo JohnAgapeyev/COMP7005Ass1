@@ -148,7 +148,7 @@ void startClient(void) {
         perror("Accept failure");
         exit(EXIT_FAILURE);
     }
-    setNonBlocking(dataSocket);
+    //setNonBlocking(dataSocket);
     //Do stuff now
     char *cmd = malloc(MAX_USER_BUFFER);
     char *filename = malloc(MAX_USER_BUFFER);
