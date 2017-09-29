@@ -69,6 +69,7 @@ void startServer(void) {
         perror("Connection error");
         exit(EXIT_FAILURE);
     }
+    setNonBlocking(messageSocket);
     setNonBlocking(dataSocket);
     //Do stuff now
 
