@@ -58,76 +58,79 @@ void startServer(void) {
     socklen_t clientAddrSize = sizeof(struct sockaddr_in);
     memset(&clientAddr, 0, sizeof(struct sockaddr_in));
 
-    dataSocket = createSocket();
+    for (;;) {
+        dataSocket = createSocket();
 
-    if ((messageSocket = accept(listenSocket, (struct sockaddr *) &clientAddr, &clientAddrSize)) == -1) {
-        perror("Accept failure");
-        exit(EXIT_FAILURE);
-    }
-
-    clientAddr.sin_port = htons(LISTENPORT);
-
-    if (connect(dataSocket, (struct sockaddr *) &clientAddr, clientAddrSize) == -1) {
-        perror("Connection error");
-        exit(EXIT_FAILURE);
-    }
-    setNonBlocking(messageSocket);
-    //setNonBlocking(dataSocket);
-    //Do stuff now
-
-    int epollfd = createEpollFD();
-
-    struct epoll_event ev;
-    ev.events = EPOLLIN | EPOLLET | EPOLLEXCLUSIVE;
-    ev.data.fd = messageSocket;
-
-    addEpollSocket(epollfd, messageSocket, &ev);
-
-    struct epoll_event *eventList = calloc(MAX_EPOLL_EVENTS, sizeof(struct epoll_event));
-
-    int nevents = waitForEpollEvent(epollfd, eventList);
-    for (int i = 0; i< nevents; ++i) {
-        if (eventList[i].events & EPOLLERR) {
-            perror("Socket error");
-            close(eventList[i].data.fd);
-            continue;
-        } else if (eventList[i].events & EPOLLHUP) {
-            close(eventList[i].data.fd);
-            continue;
-        } else if (eventList[i].events & EPOLLIN) {
-            //Read from message socket
-            char *buffer = calloc(MAX_READ_BUFFER, sizeof(char));
-            int n;
-            char *bp = buffer;
-            size_t maxRead = MAX_READ_BUFFER - 1;
-            while ((n = recv(eventList[i].data.fd, bp, maxRead, 0)) > 0) {
-                bp += n;
-                maxRead -= n;
-            }
-            buffer[MAX_READ_BUFFER - 1 - maxRead] = '\0';
-
-            if (buffer[0] == 'G') {
-                //Get message
-                sendFile(messageSocket, dataSocket, buffer + 4);
-            } else {
-                //Send message
-                char *dataBuf = calloc(MAX_READ_BUFFER, sizeof(char));
-                int n;
-                FILE *fp = fopen(buffer + 5, "w");
-                while((n = recv(dataSocket, dataBuf, MAX_READ_BUFFER, 0)) > 0) {
-                    fwrite(dataBuf, sizeof(char), n, fp);
-                }
-                free(dataBuf);
-                fclose(fp);
-            }
-            free(buffer);
+        if ((messageSocket = accept(listenSocket, (struct sockaddr *) &clientAddr, &clientAddrSize)) == -1) {
+            perror("Accept failure");
+            exit(EXIT_FAILURE);
         }
-    }
-    free(eventList);
-    close(epollfd);
 
-    close(dataSocket);
-    close(messageSocket);
+        clientAddr.sin_port = htons(LISTENPORT);
+
+        if (connect(dataSocket, (struct sockaddr *) &clientAddr, clientAddrSize) == -1) {
+            perror("Connection error");
+            exit(EXIT_FAILURE);
+        }
+        setNonBlocking(messageSocket);
+        //setNonBlocking(dataSocket);
+        //Do stuff now
+
+        int epollfd = createEpollFD();
+
+        struct epoll_event ev;
+        ev.events = EPOLLIN | EPOLLET | EPOLLEXCLUSIVE;
+        ev.data.fd = messageSocket;
+
+        addEpollSocket(epollfd, messageSocket, &ev);
+
+        struct epoll_event *eventList = calloc(MAX_EPOLL_EVENTS, sizeof(struct epoll_event));
+
+        int nevents = waitForEpollEvent(epollfd, eventList);
+        for (int i = 0; i< nevents; ++i) {
+            if (eventList[i].events & EPOLLERR) {
+                perror("Socket error");
+                close(eventList[i].data.fd);
+                continue;
+            } else if (eventList[i].events & EPOLLHUP) {
+                close(eventList[i].data.fd);
+                continue;
+            } else if (eventList[i].events & EPOLLIN) {
+                //Read from message socket
+                char *buffer = calloc(MAX_READ_BUFFER, sizeof(char));
+                int n;
+                char *bp = buffer;
+                size_t maxRead = MAX_READ_BUFFER - 1;
+                while ((n = recv(eventList[i].data.fd, bp, maxRead, 0)) > 0) {
+                    bp += n;
+                    maxRead -= n;
+                }
+                buffer[MAX_READ_BUFFER - 1 - maxRead] = '\0';
+
+                if (buffer[0] == 'G') {
+                    //Get message
+                    sendFile(messageSocket, dataSocket, buffer + 4);
+                } else {
+                    //Send message
+                    char *dataBuf = calloc(MAX_READ_BUFFER, sizeof(char));
+                    int n;
+                    FILE *fp = fopen(buffer + 5, "w");
+                    while((n = recv(dataSocket, dataBuf, MAX_READ_BUFFER, 0)) > 0) {
+                        fwrite(dataBuf, sizeof(char), n, fp);
+                    }
+                    free(dataBuf);
+                    fclose(fp);
+                }
+                free(buffer);
+            }
+        }
+        free(eventList);
+        close(epollfd);
+
+        close(dataSocket);
+        close(messageSocket);
+
+    }
 }
 
 void startClient(void) {
@@ -138,73 +141,76 @@ void startClient(void) {
     struct hostent *hp = getDestination();
     memcpy(&destAddr.sin_addr, hp->h_addr_list[0], hp->h_length);
 
-    messageSocket = createSocket();
+    for (;;) {
+        messageSocket = createSocket();
 
-    if (connect(messageSocket, (struct sockaddr *) &destAddr, sizeof(destAddr)) == -1) {
-        perror("Connection error");
-        exit(EXIT_FAILURE);
-    }
-    if ((dataSocket = accept(listenSocket, NULL, NULL)) == -1) {
-        perror("Accept failure");
-        exit(EXIT_FAILURE);
-    }
-    //setNonBlocking(dataSocket);
-    //Do stuff now
-    char *cmd = malloc(MAX_USER_BUFFER);
-    char *filename = malloc(MAX_USER_BUFFER);
-    getCommand(&cmd, &filename);
-    if (cmd[0] == 'G') {
-        //GET command
-        const size_t BUF_SIZE = strlen(cmd) + strlen(filename) + 1;
-        char *buffer = malloc(BUF_SIZE);
-        memcpy(buffer, cmd, strlen(cmd));
-        buffer[strlen(cmd)] = ' ';
-        memcpy(buffer + strlen(cmd) + 1, filename, strlen(filename));
-
-        send(messageSocket, buffer, BUF_SIZE, 0);
-
-        char response;
-        recv(messageSocket, &response, 1, 0);
-        switch(response) {
-            case 'G':
-                {
-                    //Do reading
-                    char *dataBuf = calloc(MAX_READ_BUFFER, sizeof(char));
-                    int n;
-                    FILE *fp = fopen(filename, "w");
-                    while((n = recv(dataSocket, dataBuf, MAX_READ_BUFFER, 0)) > 0) {
-                        fwrite(dataBuf, sizeof(char), n, fp);
-                    }
-                    free(dataBuf);
-                    fclose(fp);
-                }
-                break;
-            case 'B':
-                printf("%s does not exist on the server\n", filename);
-                break;
-            default:
-                puts("Server sent back bad response");
-                exit(EXIT_FAILURE);
+        if (connect(messageSocket, (struct sockaddr *) &destAddr, sizeof(destAddr)) == -1) {
+            perror("Connection error");
+            exit(EXIT_FAILURE);
         }
-        free(buffer);
-    } else {
-        const size_t BUF_SIZE = strlen(cmd) + strlen(filename) + 1;
-        char *buffer = malloc(BUF_SIZE);
-        memcpy(buffer, cmd, strlen(cmd));
-        buffer[strlen(cmd)] = ' ';
-        memcpy(buffer + strlen(cmd) + 1, filename, strlen(filename));
+        if ((dataSocket = accept(listenSocket, NULL, NULL)) == -1) {
+            perror("Accept failure");
+            exit(EXIT_FAILURE);
+        }
+        //setNonBlocking(dataSocket);
+        //Do stuff now
+        char *cmd = malloc(MAX_USER_BUFFER);
+        char *filename = malloc(MAX_USER_BUFFER);
+        getCommand(&cmd, &filename);
+        if (cmd[0] == 'G') {
+            //GET command
+            const size_t BUF_SIZE = strlen(cmd) + strlen(filename) + 1;
+            char *buffer = malloc(BUF_SIZE);
+            memcpy(buffer, cmd, strlen(cmd));
+            buffer[strlen(cmd)] = ' ';
+            memcpy(buffer + strlen(cmd) + 1, filename, strlen(filename));
 
-        send(messageSocket, buffer, BUF_SIZE, 0);
+            send(messageSocket, buffer, BUF_SIZE, 0);
 
-        //SEND comand
-        sendFile(messageSocket, dataSocket, filename);
-        free(buffer);
+            char response;
+            recv(messageSocket, &response, 1, 0);
+            switch(response) {
+                case 'G':
+                    {
+                        //Do reading
+                        char *dataBuf = calloc(MAX_READ_BUFFER, sizeof(char));
+                        int n;
+                        FILE *fp = fopen(filename, "w");
+                        while((n = recv(dataSocket, dataBuf, MAX_READ_BUFFER, 0)) > 0) {
+                            fwrite(dataBuf, sizeof(char), n, fp);
+                        }
+                        free(dataBuf);
+                        fclose(fp);
+                    }
+                    break;
+                case 'B':
+                    printf("%s does not exist on the server\n", filename);
+                    break;
+                default:
+                    puts("Server sent back bad response");
+                    exit(EXIT_FAILURE);
+            }
+            free(buffer);
+        } else {
+            const size_t BUF_SIZE = strlen(cmd) + strlen(filename) + 1;
+            char *buffer = malloc(BUF_SIZE);
+            memcpy(buffer, cmd, strlen(cmd));
+            buffer[strlen(cmd)] = ' ';
+            memcpy(buffer + strlen(cmd) + 1, filename, strlen(filename));
+
+            send(messageSocket, buffer, BUF_SIZE, 0);
+
+            //SEND comand
+            sendFile(messageSocket, dataSocket, filename);
+            free(buffer);
+        }
+        free(cmd);
+        free(filename);
+
+        close(dataSocket);
+        close(messageSocket);
+
     }
-    free(cmd);
-    free(filename);
-
-    close(dataSocket);
-    close(messageSocket);
 }
 
 int createSocket(void) {
