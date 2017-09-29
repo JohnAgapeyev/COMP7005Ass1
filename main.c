@@ -114,6 +114,9 @@ void startServer(void) {
                     //Send message
                     char *dataBuf = calloc(MAX_READ_BUFFER, sizeof(char));
                     int n;
+                    if (buffer[0] == '\0') {
+                        exit(EXIT_SUCCESS);
+                    }
                     FILE *fp = fopen(buffer + 5, "w");
                     while((n = recv(dataSocket, dataBuf, MAX_READ_BUFFER, 0)) > 0) {
                         fwrite(dataBuf, sizeof(char), n, fp);
