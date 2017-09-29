@@ -211,11 +211,15 @@ int createSocket(void) {
         perror("Socket creation failed");
         exit(EXIT_FAILURE);
     }
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0) {
+        perror("Socket option failed");
+        exit(EXIT_FAILURE);
+    }
     return sock;
 }
 
 void setNonBlocking(int sock) {
-    if (fcntl(sock, F_SETFL, O_NONBLOCK) == -1) {
+    if (fcntl(sock, F_SETFL, O_NONBLOCK | SO_REUSEADDR) == -1) {
         perror("Non blockign set failed");
         exit(EXIT_FAILURE);
     }
