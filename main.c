@@ -213,6 +213,12 @@ int createSocket(void) {
         perror("Socket creation failed");
         exit(EXIT_FAILURE);
     }
+
+    int enable = 1;
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) == -1) {
+        perror("Socket options failed");
+        exit(EXIT_FAILURE);
+    }
     return sock;
 }
 
