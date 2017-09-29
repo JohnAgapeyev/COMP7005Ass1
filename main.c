@@ -72,7 +72,7 @@ void startServer(void) {
         exit(EXIT_FAILURE);
     }
     setNonBlocking(messageSocket);
-    setNonBlocking(dataSocket);
+    //setNonBlocking(dataSocket);
     //Do stuff now
 
     int epollfd = createEpollFD();
