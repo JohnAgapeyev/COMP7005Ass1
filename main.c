@@ -63,6 +63,8 @@ void startServer(void) {
         exit(EXIT_FAILURE);
     }
 
+    clientAddr.sin_port = htons(LISTENPORT);
+
     if (connect(dataSocket, (struct sockaddr *) &clientAddr, clientAddrSize) == -1) {
         perror("Connection error");
         exit(EXIT_FAILURE);
