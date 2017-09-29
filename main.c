@@ -332,9 +332,7 @@ void getCommand(char **command, char **filename) {
         if (n == 2) {
             //Validate
             if (strncmp(*command, "GET", 3) == 0) {
-                if (access(*filename, R_OK) == 0) {
-                    break;
-                }
+                break;
             } else if (strncmp(*command, "SEND", 4) == 0) {
                 if (access(*filename, R_OK) == 0) {
                     break;
