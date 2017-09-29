@@ -300,7 +300,27 @@ void sendFile(int commSock, int dataSock, const char *filename) {
     memset(&buffer, 0, MAX_READ_BUFFER);
     int nread;
         while ((nread = fread(buffer, sizeof(char), MAX_READ_BUFFER, fp)) > 0) {
-            while(send(dataSock, &buffer, nread, 0) == -1 && (errno == EAGAIN || errno == EWOULDBLOCK));
+            int dataToSend = nread;
+            int nSent;
+            char *bp = buffer;
+
+start:
+            nSent = send(dataSock, bp, dataToSend, 0);
+            if (nSent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                goto start;
+            }
+            if (nSent < dataToSend) {
+                dataToSend -= nSent;
+                bp += nSent;
+                goto start;
+            }
+
+
+
+            //while((nSent = send(dataSock, bp, dataToSend, 0)) == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                //bp += nSent;
+                //dataToSend -= nSent;
+            //}
         }
     fclose(fp);
 }
