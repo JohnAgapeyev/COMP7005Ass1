@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <ctype.h>
 #include <unistd.h>
 #include "main.h"
@@ -298,9 +299,9 @@ void sendFile(int commSock, int dataSock, const char *filename) {
     char buffer[MAX_READ_BUFFER];
     memset(&buffer, 0, MAX_READ_BUFFER);
     int nread;
-    while ((nread = fread(buffer, sizeof(char), MAX_READ_BUFFER, fp)) > 0) {
-        send(dataSock, &buffer, nread, 0);
-    }
+        while ((nread = fread(buffer, sizeof(char), MAX_READ_BUFFER, fp)) > 0) {
+            while(send(dataSock, &buffer, nread, 0) == -1 && (errno == EAGAIN || errno == EWOULDBLOCK));
+        }
     fclose(fp);
 }
 
