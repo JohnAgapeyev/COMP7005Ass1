@@ -48,6 +48,7 @@ int main(int argc, char **argv) {
     } else {
         startClient();
     }
+    close(listenSocket);
     return EXIT_SUCCESS;
 }
 
@@ -209,10 +210,6 @@ int createSocket(void) {
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock == -1) {
         perror("Socket creation failed");
-        exit(EXIT_FAILURE);
-    }
-    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0) {
-        perror("Socket option failed");
         exit(EXIT_FAILURE);
     }
     return sock;
