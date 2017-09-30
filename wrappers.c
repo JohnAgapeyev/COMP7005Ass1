@@ -1,3 +1,29 @@
+/*
+ * SOURCE FILE: wrappers.c - Implementation of functions declared in wrappers.h
+ *
+ * PROGRAM: COMP7005Ass1
+ *
+ * DATE: Sept. 30, 2017
+ *
+ * FUNCTIONS:
+ * int createSocket(void);
+ * void setNonBlocking(int sock);
+ * void bindSocket(const int sock, const unsigned short port);
+ * struct hostent * getDestination(void);
+ * char *getUserInput(const char *prompt);
+ * void sendFile(int commSock, int dataSock, const char *filename);
+ * int createEpollFD(void);
+ * void addEpollSocket(const int epollfd, const int sock, struct epoll_event *ev);
+ * void getCommand(char **command, char **filename);
+ * int waitForEpollEvent(const int epollfd, struct epoll_event *events);
+ * void saveToFile(const char *filename);
+ * void forwardUserCommand(const char *cmd, const char *filename);
+ *
+ * DESIGNER: John Agapeyev
+ *
+ * PROGRAMMER: John Agapeyev
+ */
+
 #include <sys/socket.h>
 #include <sys/epoll.h>
 #include <netdb.h>
@@ -13,6 +39,29 @@
 #include "wrappers.h"
 #include "network.h"
 
+/*
+ *  FUNCTION: createSocket
+ *
+ *  DATE:
+ *  Sept. 30, 2017
+ *
+ *  DESIGNER:
+ *  John Agapeyev
+ *
+ *  PROGRAMMER:
+ *  John Agapeyev
+ *
+ *  INTERFACE:
+ *  int createSocket(void)
+ *
+ *  RETURNS:
+ *  int - A socket file desciptor
+ *
+ *  NOTES:
+ *  This function wraps the socket creation api call.
+ *  It also sets the SO_REUSEADDR option on the socket
+ *  for quick debugging.
+ */
 int createSocket(void) {
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock == -1) {
@@ -28,6 +77,27 @@ int createSocket(void) {
     return sock;
 }
 
+/*
+ *  FUNCTION: setNonBlocking
+ *
+ *  DATE:
+ *  Sept. 30, 2017
+ *
+ *  DESIGNER:
+ *  John Agapeyev
+ *
+ *  PROGRAMMER:
+ *  John Agapeyev
+ *
+ *  INTERFACE:
+ *  void setNonBlocking(int sock)
+ *
+ *  PARAMETERS:
+ *  int sock - The socket desciptor to set to non-blocking mode
+ *
+ *  RETURNS:
+ *  void
+ */
 void setNonBlocking(int sock) {
     if (fcntl(sock, F_SETFL, O_NONBLOCK | SO_REUSEADDR) == -1) {
         perror("Non blockign set failed");
@@ -35,6 +105,28 @@ void setNonBlocking(int sock) {
     }
 }
 
+/*
+ *  FUNCTION: bindSocket
+ *
+ *  DATE:
+ *  Sept. 30, 2017
+ *
+ *  DESIGNER:
+ *  John Agapeyev
+ *
+ *  PROGRAMMER:
+ *  John Agapeyev
+ *
+ *  INTERFACE:
+ *  void bindSocket(const int sock, const unsigned short port);
+ *
+ *  PARAMETERS:
+ *  const int sock - The socket to bind
+ *  const unsigned short - The port number in host byte order to bind to
+ *
+ *  RETURNS:
+ *  void
+ */
 void bindSocket(const int sock, const unsigned short port) {
     struct sockaddr_in myAddr;
     memset(&myAddr, 0, sizeof(struct sockaddr_in));
@@ -48,6 +140,24 @@ void bindSocket(const int sock, const unsigned short port) {
     }
 }
 
+/*
+ *  FUNCTION: getDestination
+ *
+ *  DATE:
+ *  Sept. 30, 2017
+ *
+ *  DESIGNER:
+ *  John Agapeyev
+ *
+ *  PROGRAMMER:
+ *  John Agapeyev
+ *
+ *  INTERFACE:
+ *  struct hostent * getDestination(void);
+ *
+ *  RETURNS:
+ *  struct hostent * - A pointer to a hostent structure of the destination's address
+ */
 struct hostent * getDestination(void) {
     char *userAddr = getUserInput("Enter the destination address: ");
     struct hostent *addr = gethostbyname(userAddr);
@@ -59,6 +169,32 @@ struct hostent * getDestination(void) {
     return addr;
 }
 
+/*
+ *  FUNCTION: getUserInput
+ *
+ *  DATE:
+ *  Sept. 30, 2017
+ *
+ *  DESIGNER:
+ *  John Agapeyev
+ *
+ *  PROGRAMMER:
+ *  John Agapeyev
+ *
+ *  INTERFACE:
+ *  char *getUserInput(const char *prompt);
+ *
+ *  PARAMETERS:
+ *  const char **prompt - A pointer to a string to be used to prompt the user
+ *
+ *  RETURNS:
+ *  char * - A string containing the user's input
+ *
+ *  NOTES:
+ *  This function strips leading whitespace and is guaranteed to append a null character.
+ *  Input max length is set to 1024 for simplicity, and attempting to surpass this limit results
+ *  in standard in being flushed, and the input buffer being zero'd out.
+ */
 char *getUserInput(const char *prompt) {
     char *buffer = calloc(MAX_USER_BUFFER, sizeof(char));
     if (buffer == NULL) {
@@ -97,6 +233,34 @@ char *getUserInput(const char *prompt) {
     return buffer;
 }
 
+/*
+ *  FUNCTION: sendFile
+ *
+ *  DATE:
+ *  Sept. 30, 2017
+ *
+ *  DESIGNER:
+ *  John Agapeyev
+ *
+ *  PROGRAMMER:
+ *  John Agapeyev
+ *
+ *  INTERFACE:
+ *  void sendFile(int commSock, int dataSock, const char *filename);
+ *
+ *  PARAMETERS:
+ *  int commSock - The socket used for message communication
+ *  int dataSock - The socket used for data transfer
+ *  const char *filename - The filename of the file to send
+ *
+ *  RETURNS:
+ *  void
+ *
+ *  NOTES:
+ *  This function will send a single char over the commSock corresponding as to whether the
+ *  desired file was found on the server.
+ *  This allows the client to quickly address an invalid output, while confirming if the request is valid.
+ */
 void sendFile(int commSock, int dataSock, const char *filename) {
     FILE *fp = fopen(filename, "r");
     const char bad = 'B';
@@ -130,6 +294,24 @@ start:
     fclose(fp);
 }
 
+/*
+ *  FUNCTION: createEpollFD
+ *
+ *  DATE:
+ *  Sept. 30, 2017
+ *
+ *  DESIGNER:
+ *  John Agapeyev
+ *
+ *  PROGRAMMER:
+ *  John Agapeyev
+ *
+ *  INTERFACE:
+ *  int createEpollFD(void);
+ *
+ *  RETURNS:
+ *  int - The epoll file descriptor that was created.
+ */
 int createEpollFD(void) {
     int epollfd;
     if ((epollfd = epoll_create1(0)) == -1) {
@@ -139,6 +321,29 @@ int createEpollFD(void) {
     return epollfd;
 }
 
+/*
+ *  FUNCTION: addEpollSocket
+ *
+ *  DATE:
+ *  Sept. 30, 2017
+ *
+ *  DESIGNER:
+ *  John Agapeyev
+ *
+ *  PROGRAMMER:
+ *  John Agapeyev
+ *
+ *  INTERFACE:
+ *  void addEpollSocket(const int epollfd, const int sock, struct epoll_event *ev);
+ *
+ *  PARAMETERS:
+ *  const int epollfd - The epoll file desciptor to add the socket to
+ *  const int sock - The socket to add
+ *  struct epoll_event *ev - A pointer to an epoll event struct containing the relevant flags for the socket addition
+ *
+ *  RETURNS:
+ *  void
+ */
 void addEpollSocket(const int epollfd, const int sock, struct epoll_event *ev) {
     if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sock, ev) == -1) {
         perror("epoll_ctl");
@@ -146,6 +351,35 @@ void addEpollSocket(const int epollfd, const int sock, struct epoll_event *ev) {
     }
 }
 
+/*
+ *  FUNCTION: getCommand
+ *
+ *  DATE:
+ *  Sept. 30, 2017
+ *
+ *  DESIGNER:
+ *  John Agapeyev
+ *
+ *  PROGRAMMER:
+ *  John Agapeyev
+ *
+ *  INTERFACE:
+ *  void getCommand(char **command, char **filename);
+ *
+ *  PARAMETERS:
+ *  char **command - A pointer to a string in which to store the command
+ *  char **filename - A pointer to a string in which to store the filename
+ *
+ *  RETURNS:
+ *  void
+ *
+ *  NOTES:
+ *  This function calls getUserInput and parses the result in order to get the filename and command.
+ *  The input is then validated before the method exits.
+ *  In getUserInput, the input buffer length is capped at 1024.
+ *  The reason for that cap is that the command and filename buffers passed to this method must also be at least that big
+ *  in order to guarantee no overflows occur.
+ */
 void getCommand(char **command, char **filename) {
     char *message;
     int n;
@@ -167,6 +401,28 @@ void getCommand(char **command, char **filename) {
     }
 }
 
+/*
+ *  FUNCTION: waitForEpollEvent
+ *
+ *  DATE:
+ *  Sept. 30, 2017
+ *
+ *  DESIGNER:
+ *  John Agapeyev
+ *
+ *  PROGRAMMER:
+ *  John Agapeyev
+ *
+ *  INTERFACE:
+ *  int waitForEpollEvent(const int epollfd, struct epoll_event *events);
+ *
+ *  PARAMETERS:
+ *  const int epollfd - The epoll desciptor to wait on
+ *  struct epoll_event *events - The list of epoll_event structs to fill with the detected events
+ *
+ *  RETURNS:
+ *  int - The number of events that occurred
+ */
 int waitForEpollEvent(const int epollfd, struct epoll_event *events) {
     int nevents;
     if ((nevents = epoll_wait(epollfd, events, MAX_EPOLL_EVENTS, -1)) == -1) {
@@ -176,6 +432,27 @@ int waitForEpollEvent(const int epollfd, struct epoll_event *events) {
     return nevents;
 }
 
+/*
+ *  FUNCTION: saveToFile
+ *
+ *  DATE:
+ *  Sept. 30, 2017
+ *
+ *  DESIGNER:
+ *  John Agapeyev
+ *
+ *  PROGRAMMER:
+ *  John Agapeyev
+ *
+ *  INTERFACE:
+ *  void saveToFile(const char *filename);
+ *
+ *  PARAMETERS:
+ *  const char *filename - The filename of the file in which to save the data
+ *
+ *  RETURNS:
+ *  void
+ */
 void saveToFile(const char *filename) {
     char *dataBuf = calloc(MAX_READ_BUFFER, sizeof(char));
     int n;
@@ -187,6 +464,32 @@ void saveToFile(const char *filename) {
     fclose(fp);
 }
 
+/*
+ *  FUNCTION: forwardUserCommand
+ *
+ *  DATE:
+ *  Sept. 30, 2017
+ *
+ *  DESIGNER:
+ *  John Agapeyev
+ *
+ *  PROGRAMMER:
+ *  John Agapeyev
+ *
+ *  INTERFACE:
+ *  void forwardUserCommand(const char *cmd, const char *filename);
+ *
+ *  PARAMETERS:
+ *  const char *cmd - The command to pass on
+ *  const char *filename - The filename to pass on
+ *
+ *  RETURNS:
+ *  void
+ *
+ *  NOTES:
+ *  This method is simply a wrapper around creating a buffer, filling it with the command and filename
+ *  and then sending it over the message socket.
+ */
 void forwardUserCommand(const char *cmd, const char *filename) {
     const size_t BUF_SIZE = strlen(cmd) + strlen(filename) + 1;
     char *buffer = malloc(BUF_SIZE);

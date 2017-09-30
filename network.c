@@ -1,3 +1,27 @@
+/*
+ * SOURCE FILE: network.c - Implementation of functions declared in network.h
+ *
+ * PROGRAM: COMP7005Ass1
+ *
+ * DATE: Sept. 30, 2017
+ *
+ * FUNCTIONS:
+ * void startServer(void);
+ * void startClient(void);
+ * void getMessage(void);
+ *
+ * VARIABLES:
+ * int listenSocket - The socket that listens for incoming connections
+ * int messageSocket - The socket that transfers commands
+ * int dataSocket - The socket that transfers data
+ * bool isClient - Whether the application is running as the client
+ * bool isServer - Whether the application is running as the server
+ *
+ * DESIGNER: John Agapeyev
+ *
+ * PROGRAMMER: John Agapeyev
+ */
+
 #include <sys/epoll.h>
 #include <netdb.h>
 #include <netinet/ip.h>
@@ -16,6 +40,28 @@ int dataSocket;
 bool isClient = false;
 bool isServer = false;
 
+/*
+ *  FUNCTION: main
+ *
+ *  DATE:
+ *  Sept. 30, 2017
+ *
+ *  DESIGNER:
+ *  John Agapeyev
+ *
+ *  PROGRAMMER:
+ *  John Agapeyev
+ *
+ *  INTERFACE:
+ *  int main(int argc, char **argv);
+ *
+ *  PARAMETERS:
+ *  int argc - The argument count
+ *  char **argv - The list of command arguments
+ *
+ *  RETURNS:
+ *  int
+ */
 int main(int argc, char **argv) {
     int option;
 
@@ -49,6 +95,27 @@ int main(int argc, char **argv) {
     return EXIT_SUCCESS;
 }
 
+/*
+ *  FUNCTION: startServer
+ *
+ *  DATE:
+ *  Sept. 30, 2017
+ *
+ *  DESIGNER:
+ *  John Agapeyev
+ *
+ *  PROGRAMMER:
+ *  John Agapeyev
+ *
+ *  INTERFACE:
+ *  void startServer(void);
+ *
+ *  RETURNS:
+ *  void
+ *
+ *  NOTES:
+ *  This function wraps the core functionality of the server
+ */
 void startServer(void) {
     struct sockaddr_in clientAddr;
     socklen_t clientAddrSize = sizeof(struct sockaddr_in);
@@ -77,6 +144,27 @@ void startServer(void) {
     }
 }
 
+/*
+ *  FUNCTION: startClient
+ *
+ *  DATE:
+ *  Sept. 30, 2017
+ *
+ *  DESIGNER:
+ *  John Agapeyev
+ *
+ *  PROGRAMMER:
+ *  John Agapeyev
+ *
+ *  INTERFACE:
+ *  void startClient(void);
+ *
+ *  RETURNS:
+ *  void
+ *
+ *  NOTES:
+ *  This function wraps the main functionality of the client
+ */
 void startClient(void) {
     struct sockaddr_in destAddr;
     memset(&destAddr, 0, sizeof(struct sockaddr_in));
@@ -129,6 +217,29 @@ void startClient(void) {
     }
 }
 
+/*
+ *  FUNCTION: getMessage
+ *
+ *  DATE:
+ *  Sept. 30, 2017
+ *
+ *  DESIGNER:
+ *  John Agapeyev
+ *
+ *  PROGRAMMER:
+ *  John Agapeyev
+ *
+ *  INTERFACE:
+ *  void getMessage(void)
+ *
+ *  RETURNS:
+ *  void
+ *
+ *  NOTES:
+ *  This method is only ever called by the server.
+ *  This method waits on the message socket until there is an incoming request,
+ *  then handles it appropriately.
+ */
 void getMessage(void) {
     int epollfd = createEpollFD();
 
